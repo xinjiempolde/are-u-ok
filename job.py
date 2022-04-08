@@ -4,7 +4,6 @@ import re
 import time
 from datetime import timedelta, timezone, datetime
 from random import randint
-from re import Pattern
 
 from requests import session, Response, Session
 
@@ -33,17 +32,20 @@ class Job:
 
     _feedback_url: str = "https://e-report.neu.edu.cn/notes"
 
-    _lt_matcher: Pattern = re.compile(r'name="lt" value="(.+?)"')
+    _lt_matcher = re.compile(r'name="lt" value="(.+?)"')
 
-    _login_path_matcher: Pattern = re.compile(r'id="loginForm" action="(.+?)"')
+    _execution_matcher = re.compile(r'name="execution" value="(.*?)"')
 
-    _token_matcher: Pattern = re.compile(r'name="_token" value="(.+?)"')
+    _login_path_matcher = re.compile(r'id="loginForm" action="(.+?)"')
 
-    _name_matcher: Pattern = re.compile(r'当前用户：(.+?) <span')
+    _token_matcher = re.compile(r'name="_token" value="(.+?)"')
 
-    _class_matcher: Pattern = re.compile(r'"suoshubanji":"(.+?)"')
+    _name_matcher = re.compile(r'当前用户：(.+?) <span')
 
-    _date_matcher: Pattern = re.compile(r'"created_on":"(.+?)"')
+    _class_matcher = re.compile(r'"suoshubanji":"(.+?)"')
+
+    _date_matcher = re.compile(r'"created_on":"(.+?)"')
+
 
     _wrong_auth: str = '账号或密码错误'
     _bad_info: str = '信息获取失败'
@@ -59,13 +61,22 @@ class Job:
         self._token: str = ""
         self._name: str = ""
         self._lt = ""
+        self._execution = ""
         self._login_path: str = ""
         self._class: str = ""
         self._date: str = ""
 
     @property
-    def _login_body(self) -> str:
-        return f'rsa={self._username}{self._password}{self._lt}&ul={len(self._username)}&pl={len(self._password)}&lt={self._lt}&execution=e1s1&_eventId=submit'
+    def _login_body(self):
+        post_data = {
+            'rsa': self._username + self._password + self._lt,
+            'ul': len(self._username),
+            'pl': len(self._password),
+            'lt': self._lt,
+            'execution': self._execution,
+            '_eventId': 'submit'
+        }
+        return post_data
 
     @property
     def _login_url(self) -> str:
@@ -121,11 +132,12 @@ class Job:
             resp: Response = self._client.get(self._init_url)
             lt: list = self._lt_matcher.findall(resp.text)
             lp: list = self._login_path_matcher.findall(resp.text)
+            execution: list = self._execution_matcher.findall(resp.text)
             if len(lt) < 1 or len(lp) < 1:
                 return False, self._bad_init_login
             self._lt = lt[0]
             self._login_path = lp[0]
-
+            self._execution = execution[0]
             resp: Response = self._client.post(self._login_url, data=self._login_body, headers=self._login_header)
             if self._is_login_success(resp):
                 return True, ''
